@@ -27,9 +27,9 @@ services:
         # Overrides the Dockerfile CMD: runs migrations and key gen before Flask dev server
         command: >
             sh -c "
-              python -m flask --app views.py db upgrade &&
-              python -c 'from lti13_config import LTI13Config; import os; LTI13Config.generate_key_pair() if not os.path.exists(LTI13Config.PRIVATE_KEY_PATH) else None' &&
-              python -m flask --app views.py run --host=0.0.0.0 --port=5001 --debug
+              python -m flask --app app db upgrade &&
+              python -c 'from shared.lti13_config import LTI13Config; import os; LTI13Config.generate_key_pair() if not os.path.exists(LTI13Config.PRIVATE_KEY_PATH) else None' &&
+              python -m flask --app app run --host=0.0.0.0 --port=5001 --debug
             "
         environment:
             FLASK_ENV: development
@@ -90,6 +90,9 @@ volumes:
     postgres_data:
     uploads_data:
     lti_keys:
+        # Fixed name so the keys Canvas trusts don't depend on the checkout
+        # folder / compose project name (the default is <project>_lti_keys)
+        name: autoextend_lti_keys
     frontend_node_modules:
 
 networks:

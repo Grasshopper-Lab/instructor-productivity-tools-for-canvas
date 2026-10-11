@@ -16,7 +16,7 @@
   "env": {
     "FLASK_APP": {
       "description": "Flask application entry point",
-      "value": "views.py"
+      "value": "app.py"
     },
     "SECRET_KEY": {
       "description": "Secret key for Flask sessions",

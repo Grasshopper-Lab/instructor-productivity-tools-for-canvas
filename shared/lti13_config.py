@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Repo root (this file lives in shared/). Keys must stay at <repo>/keys — the
+# lti_keys Docker volume is mounted there, and Canvas trusts those keys.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 class LTI13Config:
     """LTI 1.3 Configuration"""
     
@@ -36,8 +40,8 @@ class LTI13Config:
         return f"{self.TOOL_BASE_URL}/lti/jwks"
     
     # Key Management
-    PRIVATE_KEY_PATH = os.path.join(os.path.dirname(__file__), 'keys', 'private.pem')
-    PUBLIC_KEY_PATH = os.path.join(os.path.dirname(__file__), 'keys', 'public.pem')
+    PRIVATE_KEY_PATH = os.path.join(REPO_ROOT, 'keys', 'private.pem')
+    PUBLIC_KEY_PATH = os.path.join(REPO_ROOT, 'keys', 'public.pem')
     
     @classmethod
     def generate_key_pair(cls):
