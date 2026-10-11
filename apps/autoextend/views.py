@@ -260,7 +260,8 @@ def serve_client(path=''):
         import requests
 
         query_string = request.query_string.decode('utf-8')
-        vite_url = f'http://localhost:3008/client/{path}'
+        vite_base = os.environ.get('VITE_DEV_SERVER_URL', 'http://localhost:3008')
+        vite_url = f'{vite_base}/client/{path}'
         if query_string:
             vite_url += f'?{query_string}'
 

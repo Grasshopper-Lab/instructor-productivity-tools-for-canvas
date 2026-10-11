@@ -237,7 +237,11 @@ class LTI13Service:
     def get_canvas_public_keys(self):
         """Fetch Canvas public keys for JWT verification"""
         try:
-            response = requests.get(lti_config.LTI_KEY_SET_URL, timeout=10)
+            response = requests.get(
+                lti_config.LTI_KEY_SET_URL,
+                headers={'User-Agent': config.USER_AGENT},
+                timeout=10
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -342,7 +346,10 @@ class LTI13Service:
             response = requests.post(
                 lti_config.LTI_AUTH_TOKEN_URL,
                 data=data,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': config.USER_AGENT,
+                },
                 timeout=10
             )
             response.raise_for_status()

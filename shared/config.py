@@ -23,6 +23,9 @@ LOG_LEVEL = 'DEBUG'
 LOG_MAX_BYTES = 1024 * 1024 * 5  # 5 MB
 LOG_BACKUP_COUNT = 1
 
+# Canvas blocks API requests that don't send an identifying User-Agent
+USER_AGENT = 'extension-requests-app/1.0'
+
 # Canvas API Configuration
 CANVAS_API_URL = os.environ.get('CANVAS_API_URL', '')
 CANVAS_API_TOKEN = os.environ.get('CANVAS_API_TOKEN', '')
