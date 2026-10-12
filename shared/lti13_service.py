@@ -6,11 +6,11 @@ from datetime import datetime, timedelta, timezone
 from flask import request, session, redirect
 from urllib.parse import urlencode, parse_qs
 import requests
-from lti13_config import lti_config
+from shared.lti13_config import lti_config
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
-import settings
+from shared import config
 
 # Temporary state storage (in production, use Redis or database)
 _state_storage = {}
@@ -40,7 +40,7 @@ class LTI13Service:
             # Check if client_id is approved (falls back to .env value as always-approved)
             effective_client_id = client_id or lti_config.LTI_CLIENT_ID
             if effective_client_id != lti_config.LTI_CLIENT_ID:
-                from models import ApprovedClient
+                from shared.models import ApprovedClient
                 if not ApprovedClient.is_approved(effective_client_id):
                     self.app.logger.warning(f"Rejected unapproved client_id: {effective_client_id}")
                     raise ValueError(f"Client ID not approved. Contact the app administrator.")
@@ -237,7 +237,11 @@ class LTI13Service:
     def get_canvas_public_keys(self):
         """Fetch Canvas public keys for JWT verification"""
         try:
-            response = requests.get(lti_config.LTI_KEY_SET_URL, timeout=10)
+            response = requests.get(
+                lti_config.LTI_KEY_SET_URL,
+                headers={'User-Agent': config.USER_AGENT},
+                timeout=10
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -305,7 +309,7 @@ class LTI13Service:
     def is_instructor(self):
         """Check if current user has instructor role"""
         roles = session.get('lti_roles', [])
-        return any(role in settings.INSTRUCTOR_ROLES for role in roles)
+        return any(role in config.INSTRUCTOR_ROLES for role in roles)
     
     def is_student(self):
         """Check if current user has student role"""
@@ -342,7 +346,10 @@ class LTI13Service:
             response = requests.post(
                 lti_config.LTI_AUTH_TOKEN_URL,
                 data=data,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': config.USER_AGENT,
+                },
                 timeout=10
             )
             response.raise_for_status()

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Assignment Extension Manager Flask application.
-This file imports the Flask app from views.py and runs it.
+Main entry point for the Canvas LTI tools Flask application.
+Used by Docker, Procfile, Render and Heroku (flask --app app / gunicorn app:app).
+Currently serves the autoextend tool from apps/autoextend/views.py.
 """
 
-from views import app
+from apps.autoextend.views import app
 
 if __name__ == '__main__':
     # Run the Flask development server

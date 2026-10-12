@@ -4,10 +4,10 @@ services:
     name: extension-manager
     runtime: python3
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m flask --app views.py run --host=0.0.0.0 --port=$PORT
+    startCommand: python -m flask --app app run --host=0.0.0.0 --port=$PORT
     envVars:
       - key: FLASK_APP
-        value: views.py
+        value: app.py
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
