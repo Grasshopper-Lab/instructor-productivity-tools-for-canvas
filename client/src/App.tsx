@@ -16,7 +16,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       {tool === 'csv-gradebook' ? (
           
-          <CSVGradebook />
+          <CSVGradebook courseId={courseId}/>
         ) : (
       <div className="container mx-auto">
         {userRole === 'instructor' ? (

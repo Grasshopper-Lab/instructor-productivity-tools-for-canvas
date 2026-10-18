@@ -1,5 +1,8 @@
 
 import { useState } from 'react';
+import { assignmentApi } from '../../services/api';
+import type { Assignment} from '../../types';
+import { useQuery } from '@tanstack/react-query';
 
 type GradeRow = {
     studentId: string;
@@ -91,12 +94,68 @@ function parseCsv(text: string): GradeRow[] {
       return { studentId, studentEmail, score }
     })
   }
-  
 
-export function CSVGradebook(){
+
+
+//props
+interface CSVGradebookProps {
+  courseId: number;
+}
+
+
+export function SelectAssignment({ courseId }: CSVGradebookProps){
+  const {
+    data: assignments = [],
+    isError: assignmentsLoadFailed,
+    isLoading: assignmentsLoading,
+    refetch: refetchAssignments
+  } = useQuery({
+    queryKey: ['assignments', courseId],
+    queryFn: () => assignmentApi.getAssignments(courseId),
+    retry: false
+  });
+
+  if (assignmentsLoading) {
+    return <p>Loading assignments...</p>;
+  }
+
+  if (assignmentsLoadFailed){
+    return (
+      <div>
+        <p className="text-red-600">Failed to load assignments.</p>
+        <button
+          onClick={() => refetchAssignments()}
+          className="mt-2 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );}
+
+  if (assignments.length === 0) {
+    return <p>No assignments found for this course.</p>;
+  }
+
+  return (
+    <select>
+      {assignments.map((assignment: Assignment) => (
+        <option key={assignment.id} value={assignment.id}>
+          {assignment.title}
+        </option>
+      ))}
+    </select>
+  );
+
+}
+
+
+export function CSVGradebook({ courseId }: CSVGradebookProps) {
     const [csvText, setCsvText] = useState('');
     const [error, setError] = useState('');
     const rows = parseCsv(csvText);
+
+    //debugging
+    console.log('CSV Gradebook courseId:', courseId);
 
     async function handleFile(file?: File) {
         if (!file) return;
@@ -117,6 +176,8 @@ export function CSVGradebook(){
                 Upload a CSV file with student identifiers and grades.
             </p>
 
+            <SelectAssignment courseId={courseId} />
+
             <div className="space-y-4">
                 <label htmlFor="csv-upload" className="block text-sm font-medium text-gray-700">
                     Upload CSV File
@@ -128,6 +189,8 @@ export function CSVGradebook(){
                     onChange={(e) => handleFile(e.target.files?.[0])}
                 />
             </div>
+
+            <p>{rows.length} student rows detected</p>
 
             <div>
                 <label htmlFor="csv-data" className="mb-2 block font-semibold">
@@ -147,27 +210,8 @@ export function CSVGradebook(){
             </div>
 
             {error && <p role='alert' className="text-red-600">{error}</p>}
-
-            <h2 className="text-2xl font-bold">Parsed grades</h2>
-            <table className="w-full table-auto border-collapse border border-gray-300">
-                <thead>
-                    <tr className="bg-gray-100">
-                        <th className="border border-gray-300 px-4 py-2">Student ID</th>
-                        <th className="border border-gray-300 px-4 py-2">Email</th>
-                        <th className="border border-gray-300 px-4 py-2">Grade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((row, index) => (
-                        <tr key={index} className="border-b">
-                            <td className="border border-gray-300 px-4 py-2">{row.studentId}</td>
-                            <td className="border border-gray-300 px-4 py-2">{row.studentEmail}</td>
-                            <td className="border border-gray-300 px-4 py-2">{row.score}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
             </main>
     )
 
 }
+
