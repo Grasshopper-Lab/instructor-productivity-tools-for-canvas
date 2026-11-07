@@ -10,6 +10,8 @@ from canvasapi import Canvas
 from canvasapi.exceptions import CanvasException
 from flask import current_app
 
+from shared import config
+
 
 class CanvasService:
     """Service for interacting with Canvas API"""
@@ -35,6 +37,9 @@ class CanvasService:
 
         # Initialize Canvas API client
         self.canvas = Canvas(self.api_url, token)
+        # canvasapi doesn't expose its requests.Session publicly; set the
+        # User-Agent there so every Canvas API call carries it
+        self.canvas._Canvas__requester._session.headers['User-Agent'] = config.USER_AGENT
 
     def get_course(self, course_id: int):
         """Get course by ID"""

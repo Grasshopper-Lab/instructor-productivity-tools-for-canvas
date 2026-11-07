@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { assignmentApi, extensionApi, policyApi } from '../services/api';
-import type { Assignment, ExtensionRequestForm } from '../types';
+import { assignmentApi, extensionApi, policyApi } from '../../services/api';
+import type { Assignment, ExtensionRequestForm } from '../../types';
 import { format } from 'date-fns';
-import { localDateTimeToUtcIso } from '../utils/datetime';
-import { getApiErrorMessage } from '../utils/errors';
+import { localDateTimeToUtcIso } from '../../utils/datetime';
+import { getApiErrorMessage } from '../../utils/errors';
 
 // Helper function to get a date string with time set to 11:59 PM in local timezone
 const getDefaultDateTime = (date: Date): string => {

@@ -23,11 +23,11 @@ done
 echo "  PostgreSQL ready."
 
 echo "==> Running database migrations..."
-python -m flask --app views.py db upgrade
+python -m flask --app app db upgrade
 
 echo "==> Checking LTI keys..."
 python -c "
-from lti13_config import LTI13Config
+from shared.lti13_config import LTI13Config
 import os
 if not os.path.exists(LTI13Config.PRIVATE_KEY_PATH):
     print('  Generating RSA key pair...')
@@ -47,4 +47,4 @@ exec gunicorn \
     --timeout 120 \
     --access-logfile - \
     --error-logfile - \
-    "views:app"
+    "app:app"

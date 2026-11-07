@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { extensionApi, policyApi } from '../services/api';
-import type { ExtensionPolicy } from '../types';
+import { extensionApi, policyApi } from '../../services/api';
+import type { ExtensionPolicy } from '../../types';
 import { format } from 'date-fns';
-import { localDateTimeToUtcIso, toDateTimeLocalString } from '../utils/datetime';
-import { getApiErrorMessage } from '../utils/errors';
+import { localDateTimeToUtcIso, toDateTimeLocalString } from '../../utils/datetime';
+import { getApiErrorMessage } from '../../utils/errors';
 
 // Helper function to add session token to file URLs
 const addTokenToUrl = (url: string): string => {

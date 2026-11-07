@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import axe from 'axe-core'
-import { InstructorView } from '../pages/InstructorView'
+import { InstructorView } from '../apps/auto-extend/InstructorView'
 import { extensionApi, policyApi } from '../services/api'
 
 vi.mock('../services/api', () => ({

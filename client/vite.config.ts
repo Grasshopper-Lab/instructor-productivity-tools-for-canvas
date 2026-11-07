@@ -10,6 +10,8 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3008,
+    // Backend container proxies /client/* here using the Docker service name as Host
+    allowedHosts: ['frontend'],
     proxy: {
       '/api':     { target: backendUrl, changeOrigin: true, secure: false },
       '/launch':  { target: backendUrl, changeOrigin: true, secure: false },

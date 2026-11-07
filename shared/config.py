@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+from shared.lti13_config import lti_config, REPO_ROOT
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -20,6 +22,9 @@ LOG_FORMAT = '%(asctime)s [%(levelname)s] {%(filename)s:%(lineno)d} %(message)s'
 LOG_LEVEL = 'DEBUG'
 LOG_MAX_BYTES = 1024 * 1024 * 5  # 5 MB
 LOG_BACKUP_COUNT = 1
+
+# Canvas blocks API requests that don't send an identifying User-Agent
+USER_AGENT = 'extension-requests-app/1.0'
 
 # Canvas API Configuration
 CANVAS_API_URL = os.environ.get('CANVAS_API_URL', '')
@@ -58,3 +63,28 @@ INSTRUCTOR_ROLES = [
     'http://purl.imsglobal.org/vocab/lis/v2/membership#ContentDeveloper',
     'http://purl.imsglobal.org/vocab/lis/v2/institution/person#Administrator',
 ]
+
+# Runtime paths, anchored to the repo root so they don't move with app modules
+TEMPLATES_DIR = os.path.join(REPO_ROOT, 'templates')
+STATIC_DIR = os.path.join(REPO_ROOT, 'static')
+UPLOAD_FOLDER = os.path.join(REPO_ROOT, 'uploads')
+CLIENT_DIST_DIR = os.path.join(REPO_ROOT, 'client', 'dist')
+MIGRATIONS_DIR = os.path.join(REPO_ROOT, 'migrations')
+
+
+class BaseConfig(object):
+    DEBUG = False
+    TESTING = False
+    # LTI 1.3 Configuration
+    LTI_CLIENT_ID = lti_config.LTI_CLIENT_ID
+    LTI_ISSUER = lti_config.LTI_ISSUER
+
+
+class DevelopmentConfig(BaseConfig):
+    DEBUG = True
+    TESTING = True
+
+
+class TestingConfig(BaseConfig):
+    DEBUG = False
+    TESTING = True

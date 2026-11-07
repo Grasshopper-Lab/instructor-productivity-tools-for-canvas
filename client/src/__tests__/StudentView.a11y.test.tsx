@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import axe from 'axe-core'
-import { StudentView } from '../pages/StudentView'
+import { StudentView } from '../apps/auto-extend/StudentView'
 import { assignmentApi, extensionApi, policyApi } from '../services/api'
 
 
