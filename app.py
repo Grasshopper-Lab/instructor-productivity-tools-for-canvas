@@ -6,6 +6,7 @@ Currently serves the autoextend tool from apps/autoextend/views.py.
 """
 
 from apps.autoextend.views import app
+import apps.letter_of_rec.models
 
 if __name__ == '__main__':
     # Run the Flask development server
