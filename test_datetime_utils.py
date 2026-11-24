@@ -2,7 +2,7 @@ import unittest
 from datetime import timezone
 from zoneinfo import ZoneInfo
 
-from datetime_utils import parse_datetime_to_utc, timezone_from_name
+from shared.datetime_utils import parse_datetime_to_utc, timezone_from_name
 
 
 class DateTimeUtilsTests(unittest.TestCase):

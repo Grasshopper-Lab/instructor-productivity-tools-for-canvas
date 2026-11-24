@@ -1,5 +1,7 @@
 Flask>=2.3.0
 Flask-SQLAlchemy>=3.0.0
+# 2.1 defaults postgresql:// to psycopg (v3); we ship psycopg2
+SQLAlchemy>=2.0,<2.1
 Flask-Migrate>=4.0.5
 Flask-CORS>=4.0.0
 Jinja2>=3.1.0

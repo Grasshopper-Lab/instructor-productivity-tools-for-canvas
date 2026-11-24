@@ -45,7 +45,7 @@ WORKDIR /app
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Default command — overridden by docker-compose.yml to add migrations + debug flag
-CMD ["python", "views.py"]
+CMD ["python", "app.py"]
 
 # STAGE 4: Production target
 FROM python-builder AS production
@@ -61,8 +61,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --from=frontend-builder /client/dist ./client/dist
 
 # Application source 
-COPY views.py settings.py models.py extension_views.py ./
-COPY lti13_config.py lti13_service.py canvas_service.py file_security.py datetime_utils.py ./
+COPY app.py ./
+COPY shared/ ./shared/
+COPY apps/ ./apps/
 COPY static/ ./static/
 COPY templates/ ./templates/
 COPY migrations/ ./migrations/

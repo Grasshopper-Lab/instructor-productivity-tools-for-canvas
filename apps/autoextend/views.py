@@ -4,26 +4,27 @@ from flask import Flask, render_template, session, request, Response, jsonify, r
 from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
-import settings
 import logging
-import json
 from logging.handlers import RotatingFileHandler
 
-from models import db
-from extension_views import init_extension_routes
-from lti13_service import LTI13Service
+from shared import config
+from shared.models import db
+from shared.lti13_service import LTI13Service
+from shared.lti_registration import lti_registration, register_placements
+from apps.autoextend.extension_views import init_extension_routes
 
-app = Flask(__name__)
+# Templates and static files live at the repo root, not next to this module
+app = Flask(__name__, template_folder=config.TEMPLATES_DIR, static_folder=config.STATIC_DIR)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-app.secret_key = settings.secret_key
+app.secret_key = config.secret_key
 app.config['DEBUG'] = os.environ.get('FLASK_ENV') != 'production'
-app.config['SQLALCHEMY_DATABASE_URI'] = settings.SQLALCHEMY_DATABASE_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = settings.SQLALCHEMY_TRACK_MODIFICATIONS
-app.config['MAX_CONTENT_LENGTH'] = settings.MAX_CONTENT_LENGTH
+app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 
 # Canvas API Configuration
-app.config['CANVAS_API_URL'] = settings.CANVAS_API_URL
-app.config['CANVAS_API_TOKEN'] = settings.CANVAS_API_TOKEN
+app.config['CANVAS_API_URL'] = config.CANVAS_API_URL
+app.config['CANVAS_API_TOKEN'] = config.CANVAS_API_TOKEN
 
 app._session_tokens = {}
 
@@ -51,15 +52,18 @@ if os.environ.get('DYNO') or os.environ.get('FLASK_ENV') == 'production':
     app.config['TESTING'] = False
 
 # Configure upload folder for documentation files
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize database
 db.init_app(app)
-migrate = Migrate(app, db)
+migrate = Migrate(app, db, directory=config.MIGRATIONS_DIR)
 
 # Initialize LTI service
 lti_service = LTI13Service(app)
+
+# Shared /lti.json route
+app.register_blueprint(lti_registration)
 
 # Initialize extension routes
 init_extension_routes(app)
@@ -68,17 +72,17 @@ init_extension_routes(app)
 # ============================================
 # Logging
 
-formatter = logging.Formatter(settings.LOG_FORMAT)
+formatter = logging.Formatter(config.LOG_FORMAT)
 if os.environ.get('FLASK_ENV') == 'production':
     import sys
     handler = logging.StreamHandler(sys.stdout)
 else:
     handler = RotatingFileHandler(
-        settings.LOG_FILE,
-        maxBytes=settings.LOG_MAX_BYTES,
-        backupCount=settings.LOG_BACKUP_COUNT
+        config.LOG_FILE,
+        maxBytes=config.LOG_MAX_BYTES,
+        backupCount=config.LOG_BACKUP_COUNT
     )
-handler.setLevel(logging.getLevelName(settings.LOG_LEVEL))
+handler.setLevel(logging.getLevelName(config.LOG_LEVEL))
 handler.setFormatter(formatter)
 app.logger.addHandler(handler)
 
@@ -121,7 +125,7 @@ def lti_launch():
         learner_role = 'http://purl.imsglobal.org/vocab/lis/v2/membership#Learner'
         if learner_role in lti_claims['roles']:
             role = 'student'
-        elif any(r in lti_claims['roles'] for r in settings.INSTRUCTOR_ROLES):
+        elif any(r in lti_claims['roles'] for r in config.INSTRUCTOR_ROLES):
             role = 'instructor'
         else:
             role = 'student'
@@ -130,7 +134,7 @@ def lti_launch():
         course_id = session.get('canvas_course_id') or session.get('lti_context_id') or '12345'
 
         # Initialize user and course in database if they don't exist
-        from models import User, Course
+        from apps.autoextend.models import User, Course
 
         # Get or create user
         canvas_user_id = session.get('canvas_user_id')
@@ -201,7 +205,7 @@ def lti_launch():
 def lti_jwks():
     """Provide public keys for JWT signature verification"""
     try:
-        from lti13_config import lti_config
+        from shared.lti13_config import lti_config
         jwks = lti_config.get_jwks()
         return jsonify(jwks)
     except Exception as e:
@@ -212,66 +216,26 @@ def lti_jwks():
 
 
 
-# Configuration Routes
+# Canvas placements for this tool, served by the shared /lti.json route
 
-@app.route('/lti.json', methods=['GET'])
-def lti_json():
-    """Returns the LTI 1.3 configuration JSON for Canvas integration"""
-    try:
-        # Use TOOL_BASE_URL env var 
-        base_url = os.environ.get('TOOL_BASE_URL', request.url_root.rstrip('/')).rstrip('/')
-        
-        config = {
-            "title": "Assignment Extension Manager",
-            "scopes": [
-                "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem",
-                "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem.readonly",
-                "https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly",
-                "https://purl.imsglobal.org/spec/lti-ags/scope/score",
-                "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly",
-                "https://canvas.instructure.com/lti/account_lookup/scope/show"
-            ],
-            "extensions": [
-                {
-                    "platform": "canvas.instructure.com",
-                    "settings": {
-                        "platform": "canvas.instructure.com",
-                        "placements": [
-                            {
-                                "placement": "course_navigation",
-                                "message_type": "LtiResourceLinkRequest",
-                                "text": "Assignment Extensions",
-                                "icon_url": f"{base_url}/static/img/icon.png",
-                                "selection_width": 800,
-                                "selection_height": 600
-                            },
-                            {
-                                "placement": "assignment_menu",
-                                "message_type": "LtiResourceLinkRequest",
-                                "text": "Request Extension",
-                                "icon_url": f"{base_url}/static/img/icon.png"
-                            }
-                        ]
-                    },
-                    "privacy_level": "public"
-                }
-            ],
-            "public_jwk": {},
-            "description": "A tool for managing assignment deadline extensions in Canvas courses. Students can request extensions with supporting documentation, and instructors can review and approve/deny requests.",
-            "custom_fields": {
-                "canvas_course_id": "$Canvas.course.id",
-                "canvas_user_id": "$Canvas.user.id",
-                "canvas_user_name": "$Person.name.full"
-            },
-            "public_jwk_url": f"{base_url}/lti/jwks",
-            "target_link_uri": f"{base_url}/lti/launch",
-            "oidc_initiation_url": f"{base_url}/lti/login"
+@register_placements
+def autoextend_placements(base_url):
+    return [
+        {
+            "placement": "course_navigation",
+            "message_type": "LtiResourceLinkRequest",
+            "text": "Assignment Extensions",
+            "icon_url": f"{base_url}/static/img/icon.png",
+            "selection_width": 800,
+            "selection_height": 600
+        },
+        {
+            "placement": "assignment_menu",
+            "message_type": "LtiResourceLinkRequest",
+            "text": "Request Extension",
+            "icon_url": f"{base_url}/static/img/icon.png"
         }
-        
-        return Response(json.dumps(config, indent=2), mimetype='application/json')
-    except Exception as e:
-        app.logger.error(f"Error with LTI JSON: {e}")
-        return return_error('Error with LTI JSON configuration.')
+    ]
 
 # ============================================
 # Static Routes
@@ -287,7 +251,7 @@ def index():
 @app.route('/client/<path:path>')
 def serve_client(path=''):
     if os.environ.get('FLASK_ENV') == 'production':
-        dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'client', 'dist')
+        dist_dir = config.CLIENT_DIST_DIR
         target = os.path.join(dist_dir, path) if path else None
         if path and os.path.isfile(target):
             return send_from_directory(dist_dir, path)
@@ -296,7 +260,8 @@ def serve_client(path=''):
         import requests
 
         query_string = request.query_string.decode('utf-8')
-        vite_url = f'http://localhost:3008/client/{path}'
+        vite_base = os.environ.get('VITE_DEV_SERVER_URL', 'http://localhost:3008')
+        vite_url = f'{vite_base}/client/{path}'
         if query_string:
             vite_url += f'?{query_string}'
 
@@ -337,7 +302,7 @@ def internal_error(error):
 @click.option('--approved-by', default='admin', help='Name of person approving')
 def approve_client(client_id, issuer, org_name, approved_by):
     """Approve a new LTI client ID for use with this tool."""
-    from models import ApprovedClient
+    from shared.models import ApprovedClient
     existing = ApprovedClient.query.filter_by(client_id=client_id).first()
     if existing:
         if existing.is_active:
@@ -363,7 +328,7 @@ def approve_client(client_id, issuer, org_name, approved_by):
 @click.argument('client_id')
 def revoke_client(client_id):
     """Revoke an approved LTI client ID."""
-    from models import ApprovedClient
+    from shared.models import ApprovedClient
     record = ApprovedClient.query.filter_by(client_id=client_id).first()
     if not record:
         click.echo(f"Client ID {client_id} not found.")
@@ -376,7 +341,7 @@ def revoke_client(client_id):
 @app.cli.command('list-clients')
 def list_clients():
     """List all approved LTI client IDs."""
-    from models import ApprovedClient
+    from shared.models import ApprovedClient
     records = ApprovedClient.query.order_by(ApprovedClient.approved_at).all()
     if not records:
         click.echo("No approved clients found.")
@@ -386,7 +351,3 @@ def list_clients():
     for r in records:
         status = 'active' if r.is_active else 'revoked'
         click.echo(f"{r.client_id:<25} {status:<10} {(r.org_name or ''):<30} {r.issuer}")
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
