@@ -6,6 +6,10 @@ Currently serves the autoextend tool from apps/autoextend/views.py.
 """
 
 from apps.autoextend.views import app
+import apps.letter_of_rec.models
+from apps.letter_of_rec.views import init_letter_routes
+
+init_letter_routes(app)
 
 if __name__ == '__main__':
     # Run the Flask development server

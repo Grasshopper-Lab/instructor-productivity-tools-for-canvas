@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import requests
 from canvasapi import Canvas
-from canvasapi.exceptions import CanvasException
+from canvasapi.exceptions import CanvasException, ResourceDoesNotExist
 from flask import current_app
 
 from shared import config
@@ -421,3 +421,122 @@ class CanvasService:
         except CanvasException as e:
             self.logger.error(f"Error fetching instructors for course {course_id}: {e}")
             return []
+
+    # ------------------------------------------------------------------
+    # REQUIRES AN ACCOUNT-ADMIN TOKEN. The two methods below read another
+    # user's enrollments (including concluded courses) and search rosters of
+    # courses the token owner is not enrolled in. Canvas only allows that for
+    # the user themselves or an account admin with roster-read permission, so
+    # CANVAS_API_TOKEN must belong to such an admin. With any other token
+    # Canvas returns 401/403 (canvasapi raises Unauthorized,
+    # InvalidAccessToken or Forbidden), which these methods let propagate.
+    # ------------------------------------------------------------------
+
+    # Only current and concluded enrollments count. Deleted, rejected,
+    # invited, creation_pending and inactive enrollments are excluded.
+    TEACHER_ENROLLMENT_STATES = ['active', 'completed']
+    COURSE_USER_ENROLLMENT_STATES = ['active', 'completed']
+    COURSE_USER_ROLES = ('student', 'ta')
+
+    def get_user_teacher_courses(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        List every course a user has taught: TeacherEnrollment only, in the
+        active or completed state, so past and concluded courses are included
+        but deleted, rejected and invited-only enrollments are not.
+
+        Requires an account-admin token (see note above).
+
+        Calls GET /api/v1/users/:user_id/enrollments (paginated), then
+        GET /api/v1/courses/:id?include[]=term&include[]=concluded per course.
+        Courses Canvas no longer returns (e.g. deleted) are skipped.
+
+        Returns:
+            List of dicts: id, name, term (name or None), status
+            ('active' or 'completed')
+        """
+        from canvasapi.user import User as CanvasUser
+
+        # Build the user locally instead of fetching it: only the id is needed
+        user = CanvasUser(self.canvas._Canvas__requester, {'id': user_id})
+        enrollments = user.get_enrollments(
+            type=['TeacherEnrollment'],
+            state=self.TEACHER_ENROLLMENT_STATES,
+            per_page=100,
+        )
+
+        course_ids = []
+        for enrollment in enrollments:
+            if getattr(enrollment, 'type', None) != 'TeacherEnrollment':
+                continue
+            # Canvas filters by state[] already; re-check in case it doesn't
+            if getattr(enrollment, 'enrollment_state', None) not in self.TEACHER_ENROLLMENT_STATES:
+                continue
+            course_id = getattr(enrollment, 'course_id', None)
+            if course_id is not None and course_id not in course_ids:
+                course_ids.append(course_id)
+
+        courses = []
+        for course_id in course_ids:
+            try:
+                course = self.canvas.get_course(course_id, include=['term', 'concluded'])
+            except ResourceDoesNotExist:
+                self.logger.info(f"Skipping course {course_id}: not found in Canvas")
+                continue
+
+            term = getattr(course, 'term', None)
+            completed = (
+                bool(getattr(course, 'concluded', False))
+                or getattr(course, 'workflow_state', None) == 'completed'
+            )
+            courses.append({
+                'id': course.id,
+                'name': getattr(course, 'name', None),
+                'term': term.get('name') if isinstance(term, dict) else None,
+                'status': 'completed' if completed else 'active',
+            })
+
+        self.logger.info(f"Found {len(courses)} taught courses for user {user_id}")
+        return courses
+
+    def search_course_users_by_role(
+        self,
+        course_id: int,
+        search_term: str,
+        role: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Search a course's users with one enrollment role, in the active or
+        completed state, using Canvas's search_term (case-insensitive; Canvas
+        also matches login/SIS/email, so callers should filter on name).
+
+        Requires an account-admin token (see note above).
+
+        Calls GET /api/v1/courses/:id/search_users (paginated) with
+        enrollment_type[]=<role>. Only 'student' and 'ta' are allowed, so
+        teachers are never returned.
+
+        Returns:
+            List of dicts: id, name, sortable_name, short_name, email
+        """
+        from canvasapi.course import Course as CanvasCourse
+
+        if role not in self.COURSE_USER_ROLES:
+            raise ValueError(f"role must be one of {self.COURSE_USER_ROLES}, got {role!r}")
+
+        # Build the course locally instead of fetching it: only the id is needed
+        course = CanvasCourse(self.canvas._Canvas__requester, {'id': course_id})
+        users = course.get_users(
+            search_term=search_term,
+            enrollment_type=[role],
+            enrollment_state=self.COURSE_USER_ENROLLMENT_STATES,
+            include=['email'],
+            per_page=100,
+        )
+
+        return [{
+            'id': u.id,
+            'name': getattr(u, 'name', None),
+            'sortable_name': getattr(u, 'sortable_name', None),
+            'short_name': getattr(u, 'short_name', None),
+            'email': getattr(u, 'email', None),
+        } for u in users]
